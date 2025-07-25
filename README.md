@@ -3,49 +3,52 @@
 A Model Context Protocol (MCP) server built with [FastMCP](https://gofastmcp.com/) that provides Discord integration capabilities to MCP clients like Claude Desktop.
 
 
-## [Available Tools](./src/discord_mcp/server.py)
+### [See available tools in server.py](./src/discord_mcp/server.py)
 
 ## Installation
 
-1. Set up your Discord bot:
-   - Create a new application at [Discord Developer Portal](https://discord.com/developers/applications)
-   - Create a bot and copy the token
-   - Enable required privileged intents:
-     - MESSAGE CONTENT INTENT
-     - PRESENCE INTENT
-     - SERVER MEMBERS INTENT
-   - Invite the bot to your server using OAuth2 URL Generator
+#### 1. Set up your Discord bot:
+   1. Create a new application at [Discord Developer Portal](https://discord.com/developers/applications)
+   2. Create a bot and copy the token
+   3. Enable required privileged intents:
+      - MESSAGE CONTENT INTENT
+      - PRESENCE INTENT
+      - SERVER MEMBERS INTENT
+   4. Invite the bot to your server using OAuth2 URL Generator
 
-2. Clone and install the package:
+#### 2. Clone and install the package:
+
 ```bash
 # Clone the repository
-git clone https://github.com/hanweg/mcp-discord.git
+git clone https://github.com/eval-protocol/mcp-discord.git
 cd mcp-discord
 
 # Create and activate virtual environment
 uv venv
-.venv\Scripts\activate # On macOS/Linux, use: source .venv/bin/activate
-
-### If using Python 3.13+ - install audioop library: `uv pip install audioop-lts`
+source .venv/bin/activate
 
 # Install the package
-uv pip install -e .
+uv sync --all-extras
 ```
 
-3. Configure Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json` on Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+#### 3. Configure Claude Desktop:
 ```json
+{
+  "mcpServers": {
     "discord": {
-      "command": "uv",
-      "args": [
+    "command": "uv",
+    "args": [
         "--directory",
-        "C:\\PATH\\TO\\mcp-discord",
+        "/Users/<USER>/<PATH_TO_THIS_REPO>/mcp-discord",
         "run",
         "mcp-discord"
       ],
-      "env": {
+    "env": {
         "DISCORD_TOKEN": "your_bot_token"
       }
     }
+  }
+}
 ```
 
 ## License
