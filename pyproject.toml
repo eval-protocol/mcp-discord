@@ -1,9 +1,10 @@
 [project]
 name = "mcp-discord"
 version = "0.1.0"
-description = "Discord integration for Model Context Protocol"
+description = "MCP Server for Discord"
 authors = [
     {name = "Hanweg Altimer", email = "hanwegaltimer@outlook.com"},
+    {name = "Dylan Huang", email = "dhuang@fireworks.ai"}
 ]
 dependencies = [
     "discord.py>=2.3.0",
@@ -14,8 +15,8 @@ readme = "README.md"
 license = {file = "LICENSE"}
 
 [project.urls]
-Homepage = "https://github.com/hanweg/mcp-discord"
-Repository = "https://github.com/hanweg/mcp-discord.git"
+Homepage = "https://github.com/eval-protocol/mcp-discord"
+Repository = "https://github.com/eval-protocol/mcp-discord.git"
 
 [build-system]
 requires = ["hatchling"]
