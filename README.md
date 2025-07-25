@@ -81,3 +81,7 @@ npx -y @smithery/cli install @hanweg/mcp-discord --client claude
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Credits
+
+[hanweg](https://github.com/hanweg)
