@@ -7,8 +7,7 @@ from typing import Any, List, Optional
 from functools import wraps
 import discord
 from discord.ext import commands
-from fastmcp import Server, tool
-from fastmcp.server import stdio_server
+from fastmcp import FastMCP
 
 def _configure_windows_stdout_encoding():
     if sys.platform == "win32":
@@ -34,7 +33,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Initialize FastMCP server
-app = Server("discord-server")
+mcp = FastMCP("discord-server")
 
 # Store Discord client reference
 discord_client = None
@@ -55,7 +54,7 @@ def require_discord_client(func):
     return wrapper
 
 # Server Information Tools
-@tool
+@mcp.tool
 @require_discord_client
 async def get_server_info(server_id: str) -> str:
     """Get information about a Discord server"""
@@ -72,7 +71,7 @@ async def get_server_info(server_id: str) -> str:
     }
     return f"Server Information:\n" + "\n".join(f"{k}: {v}" for k, v in info.items())
 
-@tool
+@mcp.tool
 @require_discord_client
 async def get_channels(server_id: str) -> str:
     """Get a list of all channels in a Discord server"""
@@ -89,7 +88,7 @@ async def get_channels(server_id: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
-@tool
+@mcp.tool
 @require_discord_client
 async def list_members(server_id: str, limit: int = 100) -> str:
     """Get a list of members in a server"""
@@ -109,7 +108,7 @@ async def list_members(server_id: str, limit: int = 100) -> str:
     return f"Server Members ({len(members)}):\n" + \
            "\n".join(f"{m['name']} (ID: {m['id']}, Roles: {', '.join(m['roles'])})" for m in members)
 
-@tool
+@mcp.tool
 @require_discord_client
 async def read_messages(channel_id: str, limit: int = 10) -> str:
     """Read recent messages from a channel"""
@@ -146,7 +145,7 @@ async def read_messages(channel_id: str, limit: int = 10) -> str:
                for m in messages
            ])
 
-@tool
+@mcp.tool
 @require_discord_client
 async def send_message(channel_id: str, content: str) -> str:
     """Send a message to a specific channel"""
@@ -154,7 +153,7 @@ async def send_message(channel_id: str, content: str) -> str:
     message = await channel.send(content)
     return f"Message sent successfully. Message ID: {message.id}"
 
-@tool
+@mcp.tool
 @require_discord_client
 async def add_reaction(channel_id: str, message_id: str, emoji: str) -> str:
     """Add a reaction to a message"""
@@ -163,7 +162,7 @@ async def add_reaction(channel_id: str, message_id: str, emoji: str) -> str:
     await message.add_reaction(emoji)
     return f"Added reaction {emoji} to message"
 
-@tool
+@mcp.tool
 @require_discord_client
 async def remove_reaction(channel_id: str, message_id: str, emoji: str) -> str:
     """Remove a reaction from a message"""
@@ -172,7 +171,7 @@ async def remove_reaction(channel_id: str, message_id: str, emoji: str) -> str:
     await message.remove_reaction(emoji, discord_client.user)
     return f"Removed reaction {emoji} from message"
 
-@tool
+@mcp.tool
 @require_discord_client
 async def get_user_info(user_id: str) -> str:
     """Get information about a Discord user"""
@@ -190,7 +189,7 @@ async def get_user_info(user_id: str) -> str:
            f"Bot: {user_info['bot']}\n" + \
            f"Created: {user_info['created_at']}"
 
-@tool
+@mcp.tool
 @require_discord_client
 async def list_servers() -> str:
     """Get a list of all Discord servers the bot has access to with their details such as name, id, member count, and creation date."""
@@ -206,12 +205,12 @@ async def list_servers() -> str:
     return f"Available Servers ({len(servers)}):\n" + \
            "\n".join(f"{s['name']} (ID: {s['id']}, Members: {s['member_count']})" for s in servers)
 
-async def main():
+def main():
     # Start Discord bot in the background
-    asyncio.create_task(bot.start(DISCORD_TOKEN))
+    asyncio.run(bot.start(DISCORD_TOKEN))
     
     # Run FastMCP server
-    await app.run(stdio_server())
+    mcp.run()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
