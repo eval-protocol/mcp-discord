@@ -70,14 +70,6 @@ uv pip install -e .
     }
 ```
 
-### Installing via Smithery
-
-To install Discord Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@hanweg/mcp-discord):
-
-```bash
-npx -y @smithery/cli install @hanweg/mcp-discord --client claude
-```
-
 ## License
 
 MIT License - see LICENSE file for details.
