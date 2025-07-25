@@ -109,99 +109,6 @@ async def list_members(server_id: str, limit: int = 100) -> str:
     return f"Server Members ({len(members)}):\n" + \
            "\n".join(f"{m['name']} (ID: {m['id']}, Roles: {', '.join(m['roles'])})" for m in members)
 
-# Role Management Tools
-@tool
-@require_discord_client
-async def add_role(server_id: str, user_id: str, role_id: str) -> str:
-    """Add a role to a user"""
-    guild = await discord_client.fetch_guild(int(server_id))
-    member = await guild.fetch_member(int(user_id))
-    role = guild.get_role(int(role_id))
-    
-    await member.add_roles(role, reason="Role added via MCP")
-    return f"Added role {role.name} to user {member.name}"
-
-@tool
-@require_discord_client
-async def remove_role(server_id: str, user_id: str, role_id: str) -> str:
-    """Remove a role from a user"""
-    guild = await discord_client.fetch_guild(int(server_id))
-    member = await guild.fetch_member(int(user_id))
-    role = guild.get_role(int(role_id))
-    
-    await member.remove_roles(role, reason="Role removed via MCP")
-    return f"Removed role {role.name} from user {member.name}"
-
-# Channel Management Tools
-@tool
-@require_discord_client
-async def create_text_channel(
-    server_id: str, 
-    name: str, 
-    category_id: Optional[str] = None, 
-    topic: Optional[str] = None
-) -> str:
-    """Create a new text channel"""
-    guild = await discord_client.fetch_guild(int(server_id))
-    category = None
-    if category_id:
-        category = guild.get_channel(int(category_id))
-    
-    channel = await guild.create_text_channel(
-        name=name,
-        category=category,
-        topic=topic,
-        reason="Channel created via MCP"
-    )
-    
-    return f"Created text channel #{channel.name} (ID: {channel.id})"
-
-@tool
-@require_discord_client
-async def delete_channel(channel_id: str, reason: Optional[str] = None) -> str:
-    """Delete a channel"""
-    channel = await discord_client.fetch_channel(int(channel_id))
-    await channel.delete(reason=reason or "Channel deleted via MCP")
-    return "Deleted channel successfully"
-
-# Message Reaction Tools
-@tool
-@require_discord_client
-async def add_reaction(channel_id: str, message_id: str, emoji: str) -> str:
-    """Add a reaction to a message"""
-    channel = await discord_client.fetch_channel(int(channel_id))
-    message = await channel.fetch_message(int(message_id))
-    await message.add_reaction(emoji)
-    return f"Added reaction {emoji} to message"
-
-@tool
-@require_discord_client
-async def add_multiple_reactions(channel_id: str, message_id: str, emojis: List[str]) -> str:
-    """Add multiple reactions to a message"""
-    channel = await discord_client.fetch_channel(int(channel_id))
-    message = await channel.fetch_message(int(message_id))
-    for emoji in emojis:
-        await message.add_reaction(emoji)
-    return f"Added reactions: {', '.join(emojis)} to message"
-
-@tool
-@require_discord_client
-async def remove_reaction(channel_id: str, message_id: str, emoji: str) -> str:
-    """Remove a reaction from a message"""
-    channel = await discord_client.fetch_channel(int(channel_id))
-    message = await channel.fetch_message(int(message_id))
-    await message.remove_reaction(emoji, discord_client.user)
-    return f"Removed reaction {emoji} from message"
-
-# Message Tools
-@tool
-@require_discord_client
-async def send_message(channel_id: str, content: str) -> str:
-    """Send a message to a specific channel"""
-    channel = await discord_client.fetch_channel(int(channel_id))
-    message = await channel.send(content)
-    return f"Message sent successfully. Message ID: {message.id}"
-
 @tool
 @require_discord_client
 async def read_messages(channel_id: str, limit: int = 10) -> str:
@@ -241,6 +148,32 @@ async def read_messages(channel_id: str, limit: int = 10) -> str:
 
 @tool
 @require_discord_client
+async def send_message(channel_id: str, content: str) -> str:
+    """Send a message to a specific channel"""
+    channel = await discord_client.fetch_channel(int(channel_id))
+    message = await channel.send(content)
+    return f"Message sent successfully. Message ID: {message.id}"
+
+@tool
+@require_discord_client
+async def add_reaction(channel_id: str, message_id: str, emoji: str) -> str:
+    """Add a reaction to a message"""
+    channel = await discord_client.fetch_channel(int(channel_id))
+    message = await channel.fetch_message(int(message_id))
+    await message.add_reaction(emoji)
+    return f"Added reaction {emoji} to message"
+
+@tool
+@require_discord_client
+async def remove_reaction(channel_id: str, message_id: str, emoji: str) -> str:
+    """Remove a reaction from a message"""
+    channel = await discord_client.fetch_channel(int(channel_id))
+    message = await channel.fetch_message(int(message_id))
+    await message.remove_reaction(emoji, discord_client.user)
+    return f"Removed reaction {emoji} from message"
+
+@tool
+@require_discord_client
 async def get_user_info(user_id: str) -> str:
     """Get information about a Discord user"""
     user = await discord_client.fetch_user(int(user_id))
@@ -256,30 +189,6 @@ async def get_user_info(user_id: str) -> str:
            f"ID: {user_info['id']}\n" + \
            f"Bot: {user_info['bot']}\n" + \
            f"Created: {user_info['created_at']}"
-
-@tool
-@require_discord_client
-async def moderate_message(
-    channel_id: str, 
-    message_id: str, 
-    reason: str, 
-    timeout_minutes: Optional[int] = None
-) -> str:
-    """Delete a message and optionally timeout the user"""
-    channel = await discord_client.fetch_channel(int(channel_id))
-    message = await channel.fetch_message(int(message_id))
-    
-    # Delete the message
-    await message.delete(reason=reason)
-    
-    # Handle timeout if specified
-    if timeout_minutes and timeout_minutes > 0:
-        if isinstance(message.author, discord.Member):
-            duration = discord.utils.utcnow() + timedelta(minutes=timeout_minutes)
-            await message.author.timeout(duration, reason=reason)
-            return f"Message deleted and user timed out for {timeout_minutes} minutes."
-    
-    return "Message deleted successfully."
 
 @tool
 @require_discord_client
