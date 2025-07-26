@@ -68,7 +68,3 @@ uv sync --all-extras
 ## License
 
 MIT License - see LICENSE file for details.
-
-## Credits
-
-[hanweg](https://github.com/hanweg)
