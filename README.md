@@ -3,7 +3,7 @@
 A Model Context Protocol (MCP) server built with [FastMCP](https://gofastmcp.com/) that provides Discord integration capabilities to MCP clients like Claude Desktop.
 
 
-### [See available tools in server.py](./src/discord_mcp/server.py)
+### [See available tools in server.py](./mcp_discord/server.py)
 
 Search for `@tool` to see decorated methods that are available as tools
 
