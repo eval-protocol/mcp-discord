@@ -1,19 +1,23 @@
-import os
-import sys
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Any, List, Optional
+import os
+import sys
 from functools import wraps
+from typing import Dict, Optional
+
 import discord
 from discord.ext import commands
 from fastmcp import FastMCP
+from pydantic import BaseModel, Field
+
 
 def _configure_windows_stdout_encoding():
     if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+
 
 _configure_windows_stdout_encoding()
 
@@ -38,11 +42,13 @@ mcp = FastMCP("discord-server")
 # Store Discord client reference
 discord_client = None
 
+
 @bot.event
 async def on_ready():
     global discord_client
     discord_client = bot
     logger.info(f"Logged in as {bot.user.name}")
+
 
 # Helper function to ensure Discord client is ready
 def require_discord_client(func):
@@ -51,7 +57,31 @@ def require_discord_client(func):
         if not discord_client:
             raise RuntimeError("Discord client not ready")
         return await func(*args, **kwargs)
+
     return wrapper
+
+
+# Pydantic models for channel data
+class ChannelInfo(BaseModel):
+    name: str
+    type: str
+    position: int
+    archived: bool = Field(default=False)
+    category_id: Optional[str] = None
+    topic: Optional[str] = None
+    nsfw: Optional[bool] = None
+    slowmode_delay: Optional[int] = None
+    user_limit: Optional[int] = None
+    bitrate: Optional[int] = None
+    created_at: Optional[str] = None
+
+
+class ServerChannelsResponse(BaseModel):
+    server_name: str
+    server_id: str
+    channels: Dict[str, ChannelInfo]
+    total_channels: int
+
 
 # Server Information Tools
 @mcp.tool
@@ -67,26 +97,52 @@ async def get_server_info(server_id: str) -> str:
         "created_at": guild.created_at.isoformat(),
         "description": guild.description,
         "premium_tier": guild.premium_tier,
-        "explicit_content_filter": str(guild.explicit_content_filter)
+        "explicit_content_filter": str(guild.explicit_content_filter),
     }
-    return f"Server Information:\n" + "\n".join(f"{k}: {v}" for k, v in info.items())
+    return "Server Information:\n" + "\n".join(f"{k}: {v}" for k, v in info.items())
+
 
 @mcp.tool
 @require_discord_client
-async def get_channels(server_id: str) -> str:
+async def get_channels(server_id: str) -> ServerChannelsResponse:
     """Get a list of all channels in a Discord server"""
     try:
         guild = discord_client.get_guild(int(server_id))
         if guild:
-            channel_list = []
+            channels = {}
             for channel in guild.channels:
-                channel_list.append(f"#{channel.name} (ID: {channel.id}) - {channel.type}")
-            
-            return f"Channels in {guild.name}:\n" + "\n".join(channel_list)
+                channels[str(channel.id)] = ChannelInfo(
+                    name=channel.name,
+                    type=str(channel.type),
+                    position=channel.position,
+                    category_id=str(channel.category_id)
+                    if channel.category_id
+                    else None,
+                    topic=channel.topic if hasattr(channel, "topic") else None,
+                    nsfw=channel.nsfw if hasattr(channel, "nsfw") else None,
+                    slowmode_delay=channel.slowmode_delay
+                    if hasattr(channel, "slowmode_delay")
+                    else None,
+                    user_limit=channel.user_limit
+                    if hasattr(channel, "user_limit")
+                    else None,
+                    bitrate=channel.bitrate if hasattr(channel, "bitrate") else None,
+                    created_at=channel.created_at.isoformat()
+                    if hasattr(channel, "created_at")
+                    else None,
+                )
+
+            return ServerChannelsResponse(
+                server_name=guild.name,
+                server_id=str(guild.id),
+                channels=channels,
+                total_channels=len(channels),
+            )
         else:
-            return "Guild not found"
+            raise ValueError("Guild not found")
     except Exception as e:
-        return f"Error: {str(e)}"
+        raise RuntimeError(f"Error fetching channels: {str(e)}")
+
 
 @mcp.tool
 @require_discord_client
@@ -94,19 +150,23 @@ async def list_members(server_id: str, limit: int = 100) -> str:
     """Get a list of members in a server"""
     guild = await discord_client.fetch_guild(int(server_id))
     limit = min(limit, 1000)
-    
+
     members = []
     async for member in guild.fetch_members(limit=limit):
-        members.append({
-            "id": str(member.id),
-            "name": member.name,
-            "nick": member.nick,
-            "joined_at": member.joined_at.isoformat() if member.joined_at else None,
-            "roles": [str(role.id) for role in member.roles[1:]]  # Skip @everyone
-        })
-    
-    return f"Server Members ({len(members)}):\n" + \
-           "\n".join(f"{m['name']} (ID: {m['id']}, Roles: {', '.join(m['roles'])})" for m in members)
+        members.append(
+            {
+                "id": str(member.id),
+                "name": member.name,
+                "nick": member.nick,
+                "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+                "roles": [str(role.id) for role in member.roles[1:]],  # Skip @everyone
+            }
+        )
+
+    return f"Server Members ({len(members)}):\n" + "\n".join(
+        f"{m['name']} (ID: {m['id']}, Roles: {', '.join(m['roles'])})" for m in members
+    )
+
 
 @mcp.tool
 @require_discord_client
@@ -114,36 +174,43 @@ async def read_messages(channel_id: str, limit: int = 10) -> str:
     """Read recent messages from a channel"""
     channel = await discord_client.fetch_channel(int(channel_id))
     limit = min(limit, 100)
-    
+
     messages = []
     async for message in channel.history(limit=limit):
         reaction_data = []
         for reaction in message.reactions:
-            emoji_str = str(reaction.emoji.name) if hasattr(reaction.emoji, 'name') and reaction.emoji.name else str(reaction.emoji.id) if hasattr(reaction.emoji, 'id') else str(reaction.emoji)
-            reaction_info = {
-                "emoji": emoji_str,
-                "count": reaction.count
-            }
+            emoji_str = (
+                str(reaction.emoji.name)
+                if hasattr(reaction.emoji, "name") and reaction.emoji.name
+                else str(reaction.emoji.id)
+                if hasattr(reaction.emoji, "id")
+                else str(reaction.emoji)
+            )
+            reaction_info = {"emoji": emoji_str, "count": reaction.count}
             logger.error(f"Emoji: {emoji_str}")
             reaction_data.append(reaction_info)
-        messages.append({
-            "id": str(message.id),
-            "author": str(message.author),
-            "content": message.content,
-            "timestamp": message.created_at.isoformat(),
-            "reactions": reaction_data
-        })
-    
+        messages.append(
+            {
+                "id": str(message.id),
+                "author": str(message.author),
+                "content": message.content,
+                "timestamp": message.created_at.isoformat(),
+                "reactions": reaction_data,
+            }
+        )
+
     # Helper function to format reactions
     def format_reaction(r):
         return f"{r['emoji']}({r['count']})"
-        
-    return f"Retrieved {len(messages)} messages:\n\n" + \
-           "\n".join([
-               f"{m['author']} ({m['timestamp']}): {m['content']}\n" +
-               f"Reactions: {', '.join([format_reaction(r) for r in m['reactions']]) if m['reactions'] else 'No reactions'}"
-               for m in messages
-           ])
+
+    return f"Retrieved {len(messages)} messages:\n\n" + "\n".join(
+        [
+            f"{m['author']} ({m['timestamp']}): {m['content']}\n"
+            + f"Reactions: {', '.join([format_reaction(r) for r in m['reactions']]) if m['reactions'] else 'No reactions'}"
+            for m in messages
+        ]
+    )
+
 
 @mcp.tool
 @require_discord_client
@@ -152,6 +219,7 @@ async def send_message(channel_id: str, content: str) -> str:
     channel = await discord_client.fetch_channel(int(channel_id))
     message = await channel.send(content)
     return f"Message sent successfully. Message ID: {message.id}"
+
 
 @mcp.tool
 @require_discord_client
@@ -162,6 +230,7 @@ async def add_reaction(channel_id: str, message_id: str, emoji: str) -> str:
     await message.add_reaction(emoji)
     return f"Added reaction {emoji} to message"
 
+
 @mcp.tool
 @require_discord_client
 async def remove_reaction(channel_id: str, message_id: str, emoji: str) -> str:
@@ -170,6 +239,7 @@ async def remove_reaction(channel_id: str, message_id: str, emoji: str) -> str:
     message = await channel.fetch_message(int(message_id))
     await message.remove_reaction(emoji, discord_client.user)
     return f"Removed reaction {emoji} from message"
+
 
 @mcp.tool
 @require_discord_client
@@ -181,13 +251,16 @@ async def get_user_info(user_id: str) -> str:
         "name": user.name,
         "discriminator": user.discriminator,
         "bot": user.bot,
-        "created_at": user.created_at.isoformat()
+        "created_at": user.created_at.isoformat(),
     }
-    return f"User information:\n" + \
-           f"Name: {user_info['name']}#{user_info['discriminator']}\n" + \
-           f"ID: {user_info['id']}\n" + \
-           f"Bot: {user_info['bot']}\n" + \
-           f"Created: {user_info['created_at']}"
+    return (
+        "User information:\n"
+        + f"Name: {user_info['name']}#{user_info['discriminator']}\n"
+        + f"ID: {user_info['id']}\n"
+        + f"Bot: {user_info['bot']}\n"
+        + f"Created: {user_info['created_at']}"
+    )
+
 
 @mcp.tool
 @require_discord_client
@@ -195,22 +268,47 @@ async def list_servers() -> str:
     """Get a list of all Discord servers the bot has access to with their details such as name, id, member count, and creation date."""
     servers = []
     for guild in discord_client.guilds:
-        servers.append({
-            "id": str(guild.id),
-            "name": guild.name,
-            "member_count": guild.member_count,
-            "created_at": guild.created_at.isoformat()
-        })
-    
-    return f"Available Servers ({len(servers)}):\n" + \
-           "\n".join(f"{s['name']} (ID: {s['id']}, Members: {s['member_count']})" for s in servers)
+        servers.append(
+            {
+                "id": str(guild.id),
+                "name": guild.name,
+                "member_count": guild.member_count,
+                "created_at": guild.created_at.isoformat(),
+            }
+        )
 
-def main():
+    return f"Available Servers ({len(servers)}):\n" + "\n".join(
+        f"{s['name']} (ID: {s['id']}, Members: {s['member_count']})" for s in servers
+    )
+
+
+async def main():
     # Start Discord bot in the background
-    asyncio.run(bot.start(DISCORD_TOKEN))
-    
-    # Run FastMCP server
-    mcp.run()
+    bot_task = asyncio.create_task(bot.start(DISCORD_TOKEN))
+
+    # Wait a moment for Discord to connect
+    await asyncio.sleep(2)
+
+    # Run FastMCP server in the same event loop
+    # Note: FastMCP.run() is blocking, so we need to run it in a separate thread
+    import threading
+
+    def run_mcp():
+        mcp.run()
+
+    mcp_thread = threading.Thread(target=run_mcp, daemon=True)
+    mcp_thread.start()
+
+    try:
+        # Wait for the bot task (MCP runs in separate thread)
+        await bot_task
+    except KeyboardInterrupt:
+        logger.info("Shutting down Discord MCP server...")
+        await bot.close()
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        await bot.close()
+
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
