@@ -2,5 +2,6 @@
     "editor.formatOnSave": true,
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
-      }
+    },
+    "python.envFile": "${workspaceFolder}/.env"
 }
