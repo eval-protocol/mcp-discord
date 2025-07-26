@@ -8,7 +8,7 @@ authors = [
 ]
 dependencies = [
     "discord.py>=2.3.0",
-    "fastmcp>=2.10.6",
+    "fastmcp>=2.10.6"
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -26,7 +26,22 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/discord_mcp"]
+packages = ["mcp_discord"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "python-dotenv>=1.1.1",
+]
 
 [project.scripts]
-mcp-discord = "discord_mcp:main"
+mcp-discord = "mcp_discord:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

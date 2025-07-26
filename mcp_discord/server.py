@@ -284,30 +284,8 @@ async def list_servers() -> str:
 
 async def main():
     # Start Discord bot in the background
-    bot_task = asyncio.create_task(bot.start(DISCORD_TOKEN))
-
-    # Wait a moment for Discord to connect
-    await asyncio.sleep(2)
-
-    # Run FastMCP server in the same event loop
-    # Note: FastMCP.run() is blocking, so we need to run it in a separate thread
-    import threading
-
-    def run_mcp():
-        mcp.run()
-
-    mcp_thread = threading.Thread(target=run_mcp, daemon=True)
-    mcp_thread.start()
-
-    try:
-        # Wait for the bot task (MCP runs in separate thread)
-        await bot_task
-    except KeyboardInterrupt:
-        logger.info("Shutting down Discord MCP server...")
-        await bot.close()
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        await bot.close()
+    asyncio.create_task(bot.start(DISCORD_TOKEN))
+    await mcp.run_async()
 
 
 if __name__ == "__main__":
