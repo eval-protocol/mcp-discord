@@ -177,12 +177,76 @@ async def get_last_activity_date(thread: discord.Thread) -> datetime.datetime:
         return thread.created_at
 
 
+async def format_thread(thread: discord.Thread, idx: int) -> str:
+    # Fetch messages from the thread
+    thread_messages = []
+    async for message in thread.history(limit=None):
+        reaction_data = []
+        for reaction in message.reactions:
+            emoji_str = (
+                str(reaction.emoji.name)
+                if hasattr(reaction.emoji, "name") and reaction.emoji.name
+                else str(reaction.emoji.id)
+                if hasattr(reaction.emoji, "id")
+                else str(reaction.emoji)
+            )
+            reaction_data.append({"emoji": emoji_str, "count": reaction.count})
+
+        thread_messages.append(
+            {
+                "id": str(message.id),
+                "author": str(message.author),
+                "content": message.content,
+                "timestamp": message.created_at.isoformat(),
+                "reactions": reaction_data,
+            }
+        )
+
+    # Format thread header
+    thread_header = (
+        f"Thread {idx}:\n"
+        f"  Name: {thread.name}\n"
+        f"  ID: {thread.id}\n"
+        f"  Owner: {thread.owner}\n"
+        f"  Created: {thread.created_at}\n"
+        f"  Archived: {thread.archived}\n"
+        f"  Locked: {thread.locked}\n"
+        f"  Messages: {len(thread_messages)}/{thread.message_count}\n"
+        f"  Members: {thread.member_count}"
+    )
+
+    # Format messages in the thread
+    if thread_messages:
+
+        def format_reaction(r):
+            return f"{r['emoji']}({r['count']})"
+
+        messages_formatted = []
+        for msg_idx, msg in enumerate(thread_messages, 1):
+            messages_formatted.append(
+                f"    Message {msg_idx}:\n"
+                f"      Author: {msg['author']}\n"
+                f"      Timestamp: {msg['timestamp']}\n"
+                f"      Content: {msg['content'] or '[No content]'}\n"
+                f"      Reactions: "
+                + (
+                    ", ".join([format_reaction(r) for r in msg["reactions"]])
+                    if msg["reactions"]
+                    else "No reactions"
+                )
+            )
+
+        return thread_header + "\n\n" + "\n\n".join(messages_formatted)
+    else:
+        return thread_header + "\n  No messages found after specified datetime"
+
+
 @mcp.tool
 @require_discord_client
-async def read_messages(channel_id: str, after: datetime.datetime = None) -> str:  # noqa: F821
+async def read_messages(channel_id: str, after: datetime.datetime) -> str:  # noqa: F821
     """Read recent messages from a channel after a given datetime"""
     channel = await discord_client.fetch_channel(int(channel_id))
-
+    after_str = f" after {after.isoformat()}" if after else ""
     if channel.type == discord.ChannelType.text:
         messages = []
 
@@ -230,90 +294,24 @@ async def read_messages(channel_id: str, after: datetime.datetime = None) -> str
                 )
             )
 
-        after_str = f" after {after.isoformat()}" if after else ""
-        return f"Retrieved {len(messages)} messages{after_str}:\n\n" + "\n\n".join(
+        result = f"Retrieved {len(messages)} messages{after_str}:\n\n" + "\n\n".join(
             formatted
         )
+        formatted_threads = []
+        for idx, thread in enumerate(channel.threads, 1):
+            formatted_threads.append(await format_thread(thread, idx))
+        result += f"\n\nRetrieved {len(channel.threads)} threads:\n\n"
+        result += "\n\n".join(formatted_threads)
+        return result
 
     elif channel.type == discord.ChannelType.forum:
         # Format threads and their messages
         formatted = []
-        total_messages = 0
 
         for idx, thread in enumerate(channel.threads, 1):
-            # Fetch messages from the thread
-            thread_messages = []
-            async for message in thread.history(limit=None):
-                reaction_data = []
-                for reaction in message.reactions:
-                    emoji_str = (
-                        str(reaction.emoji.name)
-                        if hasattr(reaction.emoji, "name") and reaction.emoji.name
-                        else str(reaction.emoji.id)
-                        if hasattr(reaction.emoji, "id")
-                        else str(reaction.emoji)
-                    )
-                    reaction_data.append({"emoji": emoji_str, "count": reaction.count})
+            formatted.append(await format_thread(thread, idx))
 
-                thread_messages.append(
-                    {
-                        "id": str(message.id),
-                        "author": str(message.author),
-                        "content": message.content,
-                        "timestamp": message.created_at.isoformat(),
-                        "reactions": reaction_data,
-                    }
-                )
-
-            total_messages += len(thread_messages)
-
-            # Format thread header
-            thread_header = (
-                f"Thread {idx}:\n"
-                f"  Name: {thread.name}\n"
-                f"  ID: {thread.id}\n"
-                f"  Owner: {thread.owner}\n"
-                f"  Created: {thread.created_at}\n"
-                f"  Archived: {thread.archived}\n"
-                f"  Locked: {thread.locked}\n"
-                f"  Messages: {len(thread_messages)}/{thread.message_count}\n"
-                f"  Members: {thread.member_count}"
-            )
-
-            # Format messages in the thread
-            if thread_messages:
-
-                def format_reaction(r):
-                    return f"{r['emoji']}({r['count']})"
-
-                messages_formatted = []
-                for msg_idx, msg in enumerate(thread_messages, 1):
-                    messages_formatted.append(
-                        f"    Message {msg_idx}:\n"
-                        f"      Author: {msg['author']}\n"
-                        f"      Timestamp: {msg['timestamp']}\n"
-                        f"      Content: {msg['content'] or '[No content]'}\n"
-                        f"      Reactions: "
-                        + (
-                            ", ".join([format_reaction(r) for r in msg["reactions"]])
-                            if msg["reactions"]
-                            else "No reactions"
-                        )
-                    )
-
-                formatted.append(
-                    thread_header + "\n\n" + "\n\n".join(messages_formatted)
-                )
-            else:
-                formatted.append(
-                    thread_header + "\n  No messages found after specified datetime"
-                )
-
-        after_str = f" after {after.isoformat()}" if after else ""
-        return (
-            f"Retrieved {len(channel.threads)} threads with {total_messages} total messages{after_str}:\n\n"
-            + "\n\n".join(formatted)
-        )
+        return f"Retrieved {len(channel.threads)} threads:\n\n" + "\n\n".join(formatted)
 
     else:
         return "Unsupported channel type"
